@@ -24,7 +24,7 @@ DEFAULT_MODEL_DIR = BASE_DIR / "model"
 MODEL_DIR = Path(os.getenv("OCEAN_MODEL_PATH", str(DEFAULT_MODEL_DIR)))
 METRICS_FILE = Path(os.getenv("OCEAN_METRICS_PATH", BASE_DIR / "model" / "metrics.json"))
 
-_WEIGHT_SUFFIXES = (".pt", ".pth", ".ckpt", ".h5", ".tflite", ".onnx")
+_WEIGHT_SUFFIXES = (".pt", ".pth", ".ckpt", ".h5", ".keras", ".tflite", ".onnx")
 
 
 def model_dir() -> Path:
@@ -155,18 +155,22 @@ def _normalize_predictions(raw):
         normalized = []
         for item in items:
             if isinstance(item, dict) and "depth_m" in item and "temperature_c" in item:
-                depth = item["depth_m"]
-                temperature = item["temperature_c"]
+                entry = {
+                    "depth_m": int(float(item["depth_m"])),
+                    "temperature_c": round(float(item["temperature_c"]), 2),
+                }
+                for extra in ("mld_m", "heat_content_c", "z20_m"):
+                    if extra in item:
+                        entry[extra] = item[extra]
             elif isinstance(item, tuple) and len(item) == 2:
                 depth, temperature = item
-            else:
-                return None
-            normalized.append(
-                {
+                entry = {
                     "depth_m": int(float(depth)),
                     "temperature_c": round(float(temperature), 2),
                 }
-            )
+            else:
+                return None
+            normalized.append(entry)
         return normalized if normalized else None
     except (TypeError, ValueError):
         return None

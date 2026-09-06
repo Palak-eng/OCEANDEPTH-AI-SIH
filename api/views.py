@@ -17,6 +17,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
 
 from . import model_service
+from .supabase_auth import supabase_jwt_required
 
 STANDARD_DEPTHS = [0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 300, 500, 700, 1000]
 AUTH_RATE_LIMITS = {
@@ -368,12 +369,10 @@ def datasets(request):
 
 
 @require_http_methods(["POST", "OPTIONS"])
+@supabase_jwt_required
 def predict_temperature(request):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
-
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": "Authentication required."}, status=401)
 
     payload, error_response = _json_payload(request)
     if error_response:

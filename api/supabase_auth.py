@@ -10,6 +10,7 @@ on machines without the optional dependency installed.
 import json
 import time
 import urllib.request
+from functools import wraps
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -116,3 +117,39 @@ def supabase_me(request):
             },
         }
     )
+
+
+def supabase_jwt_required(view_fn):
+    """Decorator: accept Supabase Bearer token *or* Django session auth.
+
+    On success, attaches ``request.supabase_claims`` (dict with ``sub``,
+    ``email``, etc.) so downstream code can identify the caller.
+    """
+
+    @wraps(view_fn)
+    def wrapper(request, *args, **kwargs):
+        # Fast path: Django session (used in local dev / admin)
+        if request.user.is_authenticated:
+            request.supabase_claims = {
+                "sub": str(request.user.pk),
+                "email": request.user.email or "",
+            }
+            return view_fn(request, *args, **kwargs)
+
+        # Supabase JWT path
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            return JsonResponse(
+                {"error": "Authentication required. Sign in via Supabase or Django."},
+                status=401,
+            )
+        try:
+            claims = verify_supabase_token(token)
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=401)
+
+        request.supabase_claims = claims
+        return view_fn(request, *args, **kwargs)
+
+    return wrapper

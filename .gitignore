@@ -52,5 +52,8 @@ out/
 *.nc
 *.h5
 *.hdf5
+*.keras
+*.npz
 data/
 models/
+glb.files/
