@@ -32,16 +32,29 @@ function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
 
   // Supabase places the recovery session in the URL hash after the reset link is clicked.
+  // We listen for both the immediate getSession() result and the PASSWORD_RECOVERY event
+  // from onAuthStateChange, since the hash may not be processed on first render.
   useEffect(() => {
+    let mounted = true;
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
       if (data.session) {
         setReady(true);
-      } else {
-        setError(
-          "This reset link is invalid or has expired. Please request a new one from the sign-in page.",
-        );
       }
     });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "PASSWORD_RECOVERY" && session) {
+        setReady(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -92,6 +105,13 @@ function ResetPasswordPage() {
           {error && !ready && (
             <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
               {error}
+            </div>
+          )}
+
+          {!ready && !error && (
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Verifying reset link…
             </div>
           )}
 

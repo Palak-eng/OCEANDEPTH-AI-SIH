@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { VerticalProfileChart } from "@/components/ocean/Charts";
 import { Panel } from "@/components/ocean/Panel";
 import { AppShell } from "@/components/ocean/TopNav";
 import { SKILL_METRICS, reconstruct } from "@/lib/ocean-model";
+import { getMetrics } from "@/lib/django.functions";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
@@ -35,24 +37,48 @@ const PIPELINE = [
 function AnalyticsPage() {
   const data = useMemo(() => reconstruct(15.2, 88.6), []);
 
-  const perDepth = data.levels.map((l) => ({
-    depth: l.depth,
-    rmse: Math.abs(l.temperature - l.reference).toFixed(2),
-    bias: (l.reference - l.temperature).toFixed(2),
-    corr: (0.99 - l.depth / 12000).toFixed(2),
-    confidence: l.confidence,
-  }));
+  const metricsQuery = useQuery({
+    queryKey: ["skill-metrics"],
+    queryFn: () => getMetrics({ data: undefined }),
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+
+  const m = metricsQuery.data?.metrics;
+  const skillCards = m
+    ? [
+        { label: "RMSE", value: `${m.rmse_c.toFixed(2)} °C` },
+        { label: "Correlation", value: m.correlation.toFixed(2) },
+        { label: "Bias", value: `${m.bias_c > 0 ? "+" : ""}${m.bias_c.toFixed(2)} °C` },
+      ]
+    : SKILL_METRICS;
+
+  const perDepth = metricsQuery.data?.per_depth?.length
+    ? metricsQuery.data.per_depth.map((d) => ({
+        depth: d.depth_m,
+        rmse: d.rmse_c.toFixed(2),
+        bias: d.bias_c.toFixed(2),
+        corr: d.correlation.toFixed(2),
+        confidence: 95,
+      }))
+    : data.levels.map((l) => ({
+        depth: l.depth,
+        rmse: Math.abs(l.temperature - l.reference).toFixed(2),
+        bias: (l.reference - l.temperature).toFixed(2),
+        corr: (0.99 - l.depth / 12000).toFixed(2),
+        confidence: l.confidence,
+      }));
 
   return (
     <AppShell>
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
-          {SKILL_METRICS.map((m) => (
-            <div key={m.label} className="panel-surface px-5 py-4">
-              <p className="label-caps">{m.label}</p>
-              <p className="font-display text-3xl font-semibold">{m.value}</p>
+          {skillCards.map((card) => (
+            <div key={card.label} className="panel-surface px-5 py-4">
+              <p className="label-caps">{card.label}</p>
+              <p className="font-display text-3xl font-semibold">{card.value}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Validated against independent gridded ARGO
+                {metricsQuery.data ? "From validation against independent gridded ARGO" : "Validated against independent gridded ARGO"}
               </p>
             </div>
           ))}

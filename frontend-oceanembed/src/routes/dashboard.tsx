@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Radio } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/ocean/TopNav";
 import { OceanMap } from "@/components/ocean/OceanMap";
 import { Panel } from "@/components/ocean/Panel";
@@ -17,8 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { STANDARD_DEPTHS, reconstruct, timeSeriesFor } from "@/lib/ocean-model";
+import { STANDARD_DEPTHS, reconstruct, timeSeriesFor, type DepthLevel, type Reconstruction } from "@/lib/ocean-model";
 import { getLiveSurface } from "@/lib/ocean-data.functions";
+import { getPredictions, type PredictionResponse } from "@/lib/django.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -44,6 +46,11 @@ function Dashboard() {
   const [draft, setDraft] = useState({ lat: 18.2, lon: 72.5 });
   const [point, setPoint] = useState({ lat: 15.2, lon: 88.6 });
   const [depth, setDepth] = useState(100);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setAccessToken(data.session?.access_token ?? null));
+  }, []);
 
   const live = useQuery({
     queryKey: ["live-surface", point.lat, point.lon],
@@ -51,7 +58,7 @@ function Dashboard() {
     staleTime: 15 * 60 * 1000,
   });
 
-  const data = useMemo(
+  const synthetic = useMemo(
     () =>
       reconstruct(point.lat, point.lon, {
         sst: live.data?.sst ?? undefined,
@@ -62,6 +69,51 @@ function Dashboard() {
       }),
     [point, live.data],
   );
+
+  const mlQuery = useQuery({
+    queryKey: ["ml-predictions", point.lat, point.lon, live.data?.sst],
+    queryFn: () =>
+      getPredictions({
+        data: {
+          accessToken: accessToken!,
+          latitude: point.lat,
+          longitude: point.lon,
+          date: new Date().toISOString().slice(0, 10),
+          surface: live.data?.sst != null
+            ? { sst: live.data.sst, current_u: live.data.currentU, current_v: live.data.currentV, wind_u: live.data.windU, wind_v: live.data.windV }
+            : undefined,
+        },
+      }),
+    enabled: !!accessToken,
+    staleTime: 15 * 60 * 1000,
+    retry: false,
+  });
+
+  const data: Reconstruction = useMemo(() => {
+    if (mlQuery.data) {
+      const res = mlQuery.data as PredictionResponse;
+      const levels: DepthLevel[] = res.predictions.map((p) => ({
+        depth: p.depth_m,
+        temperature: p.temperature_c,
+        reference: synthetic.levels.find((l) => l.depth === p.depth_m)?.reference ?? p.temperature_c,
+        confidence: 95,
+      }));
+      return {
+        lat: point.lat,
+        lon: point.lon,
+        basin: synthetic.basin,
+        surface: synthetic.surface,
+        levels,
+        mld: res.predictions[0]?.mld_m ?? synthetic.mld,
+        heatContent: res.predictions[0]?.heat_content_c ?? synthetic.heatContent,
+        confidence: 95,
+        mode: res.mode,
+      } as Reconstruction & { mode: string };
+    }
+    return synthetic;
+  }, [mlQuery.data, synthetic, point]);
+
+  const mlMode = mlQuery.data ? (mlQuery.data as PredictionResponse).mode : null;
 
   const fallbackSeries = useMemo(
     () => timeSeriesFor(point.lat, point.lon, depth),
@@ -118,6 +170,16 @@ function Dashboard() {
                 {live.data.waveHeight != null
                   ? ` · waves ${live.data.waveHeight.toFixed(2)} m`
                   : ""}
+                {mlMode === "ml" && (
+                  <span className="ml-2 rounded bg-lime/20 px-1.5 py-0.5 text-lime font-semibold">
+                    ML
+                  </span>
+                )}
+                {mlMode === "demo" && (
+                  <span className="ml-2 rounded bg-amber/20 px-1.5 py-0.5 text-amber font-semibold">
+                    Demo
+                  </span>
+                )}
               </span>
             ) : (
               <span className="text-muted-foreground">

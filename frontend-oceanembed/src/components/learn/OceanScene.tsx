@@ -1,34 +1,42 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Float, Html, OrbitControls, Sparkles, Stars } from "@react-three/drei";
-import { useRef } from "react";
+import { Float, Html, OrbitControls, Sparkles, Stars, useGLTF } from "@react-three/drei";
+import { Suspense, useLayoutEffect, useRef } from "react";
 import type { Mesh, Group } from "three";
+import * as THREE from "three";
 import { ZONES, type Zone } from "./zones";
 
 
 function Satellite() {
   const g = useRef<Group>(null);
+  const { scene } = useGLTF("/satellite.glb");
+
+  useLayoutEffect(() => {
+    scene.traverse((o) => {
+      o.position.set(0, 0, 0);
+      o.rotation.set(0, 0, 0);
+      o.scale.set(1, 1, 1);
+    });
+    scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    scene.position.copy(box.getCenter(new THREE.Vector3())).negate();
+    scene.scale.setScalar(3.0 / maxDim);
+    scene.rotation.set(Math.PI , 0 ,Math.PI/2 );
+  }, [scene]);
+
   useFrame(({ clock }) => {
     if (!g.current) return;
     const t = clock.getElapsedTime() * 0.35;
-    g.current.position.x = Math.sin(t) * 3.2;
-    g.current.position.z = Math.cos(t) * 1.6;
-    g.current.rotation.y = -t;
+    g.current.position.set(Math.sin(t) * 2.0, 3, Math.cos(t) * 1.2);
+    g.current.rotation.set(0, -t, 0);
   });
+
   return (
-    <group ref={g} position={[0, 3.4, 0]}>
-      <mesh castShadow>
-        <boxGeometry args={[0.5, 0.35, 0.35]} />
-        <meshStandardMaterial color="#e2e8f0" metalness={0.5} roughness={0.3} />
-      </mesh>
-      <mesh position={[0.6, 0, 0]}>
-        <boxGeometry args={[0.6, 0.02, 0.32]} />
-        <meshStandardMaterial color="#38bdf8" emissive="#0ea5e9" emissiveIntensity={0.5} />
-      </mesh>
-      <mesh position={[-0.6, 0, 0]}>
-        <boxGeometry args={[0.6, 0.02, 0.32]} />
-        <meshStandardMaterial color="#38bdf8" emissive="#0ea5e9" emissiveIntensity={0.5} />
-      </mesh>
-      <Html center distanceFactor={9} position={[0, 0.55, 0]}>
+    <group ref={g} position={[0, 0, 0]}>
+      <primitive object={scene} />
+      <pointLight position={[0, 1, 0]} intensity={40} color="#38bdf8" distance={12} />
+      <Html center distanceFactor={9} position={[0, 0, 0]}>
         <span className="whitespace-nowrap rounded-full bg-primary/80 px-2 py-0.5 text-[10px] font-semibold text-white">
           Satellite 👀 sees the surface
         </span>
@@ -188,7 +196,9 @@ export default function OceanScene({
       <Stars radius={40} depth={20} count={800} factor={2} fade speed={0.6} />
       <Sparkles count={60} scale={[7, 8, 4]} size={2} speed={0.3} color="#a5f3fc" />
 
-      <Satellite />
+      <Suspense fallback={null}>
+        <Satellite />
+      </Suspense>
 
       {/* Sea surface */}
       <mesh position={[0, 2.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
