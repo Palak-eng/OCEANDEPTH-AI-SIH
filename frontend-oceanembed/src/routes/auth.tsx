@@ -176,7 +176,7 @@ export default function AuthPage() {
         password,
         options: {
           data: { username: username.trim() },
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
       if (error) throw error;
