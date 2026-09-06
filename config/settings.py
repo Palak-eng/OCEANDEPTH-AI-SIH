@@ -42,6 +42,12 @@ CORS_ALLOWED_ORIGINS = os.getenv(
     "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
 ).split(",")
 
+# Supabase Auth: the frontend signs users in with Supabase (email/OTP/Google)
+# and sends the Supabase access token as `Authorization: Bearer <token>`.
+# Django validates the RS256 signature against the project's JWKS.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_JWKS_CACHE_SECONDS = int(os.getenv("SUPABASE_JWKS_CACHE_SECONDS", "600"))
+
 
 # Application definition
 

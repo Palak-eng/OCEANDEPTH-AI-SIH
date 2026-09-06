@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OceanDepth AI - 2D Water Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      background: #0a1628;
+    }
+
+    .ocean {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      background: linear-gradient(180deg, #87CEEB 0%, #1a6fa0 8%, #0e4d6e 18%, #0a3a5c 35%, #062a4a 55%, #031d35 75%, #010e1e 100%);
+      overflow: hidden;
+    }
+
+    .sky {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      height: 8%;
+      background: linear-gradient(180deg, #87CEEB 0%, #b8e4f9 60%, #e8f7ff 100%);
+      z-index: 1;
+    }
+
+    .sun {
+      position: absolute;
+      top: 1%;
+      right: 15%;
+      width: 50px;
+      height: 50px;
+      background: radial-gradient(circle, #ffe566 30%, #ffcc00 100%);
+      border-radius: 50%;
+      box-shadow: 0 0 40px 15px rgba(255, 204, 0, 0.3), 0 0 80px 30px rgba(255, 204, 0, 0.15);
+      z-index: 2;
+      animation: sunPulse 4s ease-in-out infinite;
+    }
+
+    @keyframes sunPulse {
+      0%, 100% { box-shadow: 0 0 40px 15px rgba(255, 204, 0, 0.3), 0 0 80px 30px rgba(255, 204, 0, 0.15); }
+      50% { box-shadow: 0 0 50px 20px rgba(255, 204, 0, 0.4), 0 0 100px 40px rgba(255, 204, 0, 0.2); }
+    }
+
+    .cloud {
+      position: absolute;
+      background: white;
+      border-radius: 50px;
+      opacity: 0.85;
+      z-index: 2;
+    }
+
+    .cloud-1 { top: 2%; left: 10%; width: 80px; height: 25px; animation: cloudMove 25s linear infinite; }
+    .cloud-2 { top: 4%; left: 40%; width: 60px; height: 20px; animation: cloudMove 30s linear infinite reverse; }
+    .cloud-3 { top: 1%; left: 70%; width: 70px; height: 22px; animation: cloudMove 20s linear infinite; }
+
+    @keyframes cloudMove {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(80px); }
+      100% { transform: translateX(0); }
+    }
+
+    /* Waves */
+    .wave {
+      position: absolute;
+      top: 6%;
+      width: 200%;
+      height: 120px;
+      z-index: 3;
+    }
+
+    .wave svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .wave-1 { animation: waveMove1 6s ease-in-out infinite; opacity: 0.7; }
+    .wave-2 { top: 7.5%; animation: waveMove2 8s ease-in-out infinite; opacity: 0.5; }
+    .wave-3 { top: 9%; animation: waveMove3 10s ease-in-out infinite; opacity: 0.35; }
+
+    @keyframes waveMove1 { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-25%); } }
+    @keyframes waveMove2 { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-20%); } }
+    @keyframes waveMove3 { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-30%); } }
+
+    /* Light rays */
+    .light-ray {
+      position: absolute;
+      top: 10%;
+      width: 3px;
+      height: 35%;
+      background: linear-gradient(180deg, rgba(255,255,200,0.4) 0%, transparent 100%);
+      transform-origin: top center;
+      animation: rayShimmer 5s ease-in-out infinite;
+    }
+
+    .ray-1 { left: 20%; transform: rotate(-5deg); animation-delay: 0s; }
+    .ray-2 { left: 35%; transform: rotate(3deg); animation-delay: 1s; height: 30%; }
+    .ray-3 { left: 50%; transform: rotate(-2deg); animation-delay: 2s; height: 28%; }
+    .ray-4 { left: 65%; transform: rotate(6deg); animation-delay: 0.5s; }
+    .ray-5 { left: 80%; transform: rotate(-4deg); animation-delay: 1.5s; height: 32%; }
+
+    @keyframes rayShimmer {
+      0%, 100% { opacity: 0.3; width: 3px; }
+      50% { opacity: 0.7; width: 6px; }
+    }
+
+    /* Submarine */
+    .submarine {
+      position: absolute;
+      top: 30%;
+      left: 45%;
+      z-index: 10;
+      animation: subFloat 4s ease-in-out infinite;
+      filter: drop-shadow(0 0 15px rgba(100, 220, 255, 0.4));
+      transition: top 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    @keyframes subFloat {
+      0%, 100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+
+    .sub-body {
+      width: 120px;
+      height: 50px;
+      background: linear-gradient(180deg, #f0c040 0%, #d4a020 50%, #b8860b 100%);
+      border-radius: 50px 50px 40px 40px;
+      position: relative;
+      border: 2px solid #a07008;
+    }
+
+    .sub-window {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 22px;
+      height: 22px;
+      background: radial-gradient(circle, #b8f0ff 0%, #4dc9f6 40%, #1a8ab5 100%);
+      border-radius: 50%;
+      border: 3px solid #a07008;
+      box-shadow: inset 0 0 6px rgba(255,255,255,0.6), 0 0 8px rgba(77, 201, 246, 0.5);
+    }
+
+    .sub-window::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 4px;
+      width: 6px;
+      height: 6px;
+      background: rgba(255,255,255,0.7);
+      border-radius: 50%;
+    }
+
+    .sub-tower {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 16px;
+      background: linear-gradient(180deg, #d4a020, #b8860b);
+      border-radius: 8px 8px 0 0;
+      border: 2px solid #a07008;
+      border-bottom: none;
+    }
+
+    .sub-tower-window {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 8px;
+      background: #4dc9f6;
+      border-radius: 4px;
+      border: 1px solid #a07008;
+    }
+
+    .sub-propeller {
+      position: absolute;
+      right: -18px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      animation: propSpin 0.3s linear infinite;
+    }
+
+    .prop-blade {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 4px;
+      background: #888;
+      border-radius: 2px;
+      transform-origin: center;
+    }
+
+    .prop-blade:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg); }
+    .prop-blade:nth-child(2) { transform: translate(-50%, -50%) rotate(90deg); }
+
+    @keyframes propSpin { from { transform: translateY(-50%) rotate(0deg); } to { transform: translateY(-50%) rotate(360deg); } }
+
+    .sub-light {
+      position: absolute;
+      left: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-top: 15px solid transparent;
+      border-bottom: 15px solid transparent;
+      border-right: 50px solid rgba(255, 255, 150, 0.15);
+      animation: lightPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes lightPulse {
+      0%, 100% { border-right-color: rgba(255, 255, 150, 0.1); }
+      50% { border-right-color: rgba(255, 255, 150, 0.25); }
+    }
+
+    /* Bubbles */
+    .bubble {
+      position: absolute;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.6) 0%, rgba(200,240,255,0.2) 60%, transparent 100%);
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      z-index: 8;
+    }
+
+    /* Fish */
+    .fish {
+      position: absolute;
+      z-index: 9;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    .fish-body {
+      position: relative;
+      display: inline-block;
+    }
+
+    .fish-ellipse {
+      width: 36px;
+      height: 20px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .fish-tail {
+      position: absolute;
+      right: -10px;
+      top: 2px;
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+    }
+
+    .fish-eye {
+      position: absolute;
+      top: 5px;
+      left: 6px;
+      width: 5px;
+      height: 5px;
+      background: white;
+      border-radius: 50%;
+    }
+
+    .fish-eye::after {
+      content: '';
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      width: 3px;
+      height: 3px;
+      background: #111;
+      border-radius: 50%;
+    }
+
+    .fish-1 { top: 38%; animation: fishSwim1 12s linear infinite; }
+    .fish-2 { top: 45%; animation: fishSwim2 15s linear infinite reverse; }
+    .fish-3 { top: 52%; animation: fishSwim3 10s linear infinite; }
+    .fish-4 { top: 60%; animation: fishSwim1 18s linear infinite reverse; }
+
+    @keyframes fishSwim1 { 0% { left: -60px; } 100% { left: 110%; } }
+    @keyframes fishSwim2 { 0% { left: 110%; } 100% { left: -60px; } }
+    @keyframes fishSwim3 { 0% { left: -60px; } 100% { left: 110%; } }
+
+    /* Coral */
+    .coral-group {
+      position: absolute;
+      bottom: 10%;
+      z-index: 5;
+    }
+
+    .coral {
+      width: 20px;
+      height: 40px;
+      border-radius: 50% 50% 0 0;
+      display: inline-block;
+      margin: 0 2px;
+      vertical-align: bottom;
+      animation: coralSway 3s ease-in-out infinite;
+    }
+
+    @keyframes coralSway {
+      0%, 100% { transform: rotate(-2deg); }
+      50% { transform: rotate(2deg); }
+    }
+
+    /* Seaweed */
+    .seaweed {
+      position: absolute;
+      bottom: 8%;
+      width: 12px;
+      z-index: 4;
+      animation: seaweedSway 4s ease-in-out infinite;
+    }
+
+    .seaweed-segment {
+      width: 12px;
+      height: 20px;
+      border-radius: 50%;
+      margin-bottom: -6px;
+    }
+
+    @keyframes seaweedSway {
+      0%, 100% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+    }
+
+    /* Depth labels */
+    .depth-label {
+      position: absolute;
+      left: 20px;
+      color: rgba(255,255,255,0.5);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      z-index: 15;
+      text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+
+    .depth-label span {
+      display: block;
+      font-size: 9px;
+      font-weight: 400;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    /* Zone separators */
+    .zone-line {
+      position: absolute;
+      width: 100%;
+      height: 1px;
+      background: rgba(255,255,255,0.15);
+      z-index: 14;
+      left: 0;
+    }
+
+    .zone-line::after {
+      content: '';
+      position: absolute;
+      right: 20px;
+      top: -3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* Data bubbles */
+    .data-bubble {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 8px 14px;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 20;
+      animation: bubbleFloat 3s ease-in-out infinite;
+    }
+
+    .data-bubble .label {
+      font-size: 9px;
+      opacity: 0.7;
+      font-weight: 400;
+    }
+
+    .data-bubble .value {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    @keyframes bubbleFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    /* Depth Slider */
+    .depth-control {
+      position: absolute;
+      right: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .depth-control label {
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+
+    .depth-slider {
+      writing-mode: vertical-lr;
+      direction: rtl;
+      width: 6px;
+      height: 250px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: linear-gradient(180deg, #4dc9f6, #1a6fa0, #031d35);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .depth-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffe566;
+      border: 3px solid white;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 229, 102, 0.5);
+    }
+
+    .depth-value {
+      color: #ffe566;
+      font-size: 20px;
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(255, 229, 102, 0.4);
+    }
+
+    .depth-value span {
+      font-size: 11px;
+      font-weight: 400;
+      opacity: 0.7;
+    }
+
+    /* Title */
+    .title-card {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .title-card h1 {
+      color: white;
+      font-size: 28px;
+      font-weight: 800;
+      text-shadow: 0 2px 15px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+    }
+
+    .title-card p {
+      color: rgba(255,255,255,0.7);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      gap: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 12px 24px;
+    }
+
+    .status-item {
+      text-align: center;
+      color: white;
+    }
+
+    .status-item .label {
+      font-size: 9px;
+      opacity: 0.6;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-item .val {
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .status-item .val.cyan { color: #4dc9f6; }
+    .status-item .val.green { color: #79e29d; }
+    .status-item .val.yellow { color: #ffe566; }
+    .status-item .val.orange { color: #ff9f43; }
+
+    /* Jellyfish */
+    .jellyfish {
+      position: absolute;
+      z-index: 7;
+      animation: jellyFloat 6s ease-in-out infinite;
+    }
+
+    .jelly-head {
+      width: 30px;
+      height: 20px;
+      border-radius: 50% 50% 40% 40%;
+      position: relative;
+      opacity: 0.6;
+    }
+
+    .jelly-tentacle {
+      width: 2px;
+      height: 18px;
+      margin: 0 3px;
+      display: inline-block;
+      border-radius: 0 0 2px 2px;
+      animation: tentacleWave 2s ease-in-out infinite;
+    }
+
+    @keyframes jellyFloat {
+      0%, 100% { transform: translateY(0) translateX(0); }
+      25% { transform: translateY(-15px) translateX(5px); }
+      75% { transform: translateY(5px) translateX(-5px); }
+    }
+
+    @keyframes tentacleWave {
+      0%, 100% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+    }
+
+    /* Plankton particles */
+    .plankton {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(200, 255, 200, 0.4);
+      border-radius: 50%;
+      z-index: 6;
+      animation: planktonDrift 20s linear infinite;
+    }
+
+    @keyframes planktonDrift {
+      0% { transform: translateY(0) translateX(0); opacity: 0; }
+      10% { opacity: 0.6; }
+      90% { opacity: 0.6; }
+      100% { transform: translateY(-200px) translateX(40px); opacity: 0; }
+    }
+
+    /* Temperature indicator */
+    .temp-gauge {
+      position: absolute;
+      left: 30px;
+      bottom: 100px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .temp-bar {
+      width: 12px;
+      height: 160px;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #ff6b6b, #ffe566, #4dc9f6, #1a237e);
+      border: 2px solid rgba(255,255,255,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .temp-indicator {
+      position: absolute;
+      left: -4px;
+      width: 20px;
+      height: 4px;
+      background: white;
+      border-radius: 2px;
+      transition: top 0.5s ease;
+      box-shadow: 0 0 6px rgba(255,255,255,0.5);
+    }
+
+    .temp-label-top, .temp-label-bottom {
+      color: white;
+      font-size: 9px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="ocean" id="ocean">
+    <!-- Sky -->
+    <div class="sky"></div>
+    <div class="sun"></div>
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+    <div class="cloud cloud-3"></div>
+
+    <!-- Waves -->
+    <div class="wave wave-1">
+      <svg viewBox="0 0 2400 120" preserveAspectRatio="none">
+        <path d="M0,40 C200,100 400,0 600,60 C800,120 1000,10 1200,50 C1400,90 1600,20 1800,60 C2000,100 2200,30 2400,70 L2400,0 L0,0 Z" fill="rgba(135,206,235,0.6)"/>
+      </svg>
+    </div>
+    <div class="wave wave-2">
+      <svg viewBox="0 0 2400 120" preserveAspectRatio="none">
+        <path d="M0,60 C300,10 600,100 900,40 C1200,0 1500,80 1800,30 C2100,80 2300,20 2400,50 L2400,0 L0,0 Z" fill="rgba(77,201,246,0.5)"/>
+      </svg>
+    </div>
+    <div class="wave wave-3">
+      <svg viewBox="0 0 2400 120" preserveAspectRatio="none">
+        <path d="M0,50 C150,90 350,20 600,70 C850,110 1050,30 1300,60 C1550,90 1750,15 2000,55 C2250,95 2350,40 2400,60 L2400,0 L0,0 Z" fill="rgba(26,111,160,0.4)"/>
+      </svg>
+    </div>
+
+    <!-- Title -->
+    <div class="title-card">
+      <h1>OceanDepth AI</h1>
+      <p>Explore the Ocean, Predict the Future</p>
+    </div>
+
+    <!-- Light rays -->
+    <div class="light-ray ray-1"></div>
+    <div class="light-ray ray-2"></div>
+    <div class="light-ray ray-3"></div>
+    <div class="light-ray ray-4"></div>
+    <div class="light-ray ray-5"></div>
+
+    <!-- Depth labels -->
+    <div class="depth-label" style="top: 18%;">Surface <span>0m</span></div>
+    <div class="depth-label" style="top: 32%;">Sunlight Zone <span>200m</span></div>
+    <div class="depth-label" style="top: 55%;">Twilight Zone <span>500m</span></div>
+    <div class="depth-label" style="top: 78%;">Deep Ocean <span>1000m</span></div>
+
+    <!-- Zone lines -->
+    <div class="zone-line" style="top: 28%;"></div>
+    <div class="zone-line" style="top: 55%;"></div>
+    <div class="zone-line" style="top: 80%;"></div>
+
+    <!-- Data Bubbles -->
+    <div class="data-bubble" style="top: 22%; right: 120px; animation-delay: 0s;">
+      <div class="label">SST</div>
+      <div class="value cyan">28.4°C</div>
+    </div>
+    <div class="data-bubble" style="top: 40%; right: 140px; animation-delay: 1s;">
+      <div class="label">SSS</div>
+      <div class="value green">34.7 PSU</div>
+    </div>
+    <div class="data-bubble" style="top: 58%; right: 110px; animation-delay: 2s;">
+      <div class="label">SSH</div>
+      <div class="value yellow">0.12 m</div>
+    </div>
+    <div class="data-bubble" style="top: 75%; right: 130px; animation-delay: 0.5s;">
+      <div class="label">Wind</div>
+      <div class="value orange">4.1 m/s</div>
+    </div>
+
+    <!-- Submarine -->
+    <div class="submarine" id="submarine">
+      <div class="sub-light"></div>
+      <div class="sub-tower">
+        <div class="sub-tower-window"></div>
+      </div>
+      <div class="sub-body">
+        <div class="sub-window"></div>
+        <div class="sub-propeller">
+          <div class="prop-blade"></div>
+          <div class="prop-blade"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fish -->
+    <div class="fish fish-1">
+      <div class="fish-body">
+        <div class="fish-ellipse" style="background: linear-gradient(180deg, #ff9f43, #ee5a24);">
+          <div class="fish-eye"></div>
+        </div>
+        <div class="fish-tail" style="border-right: 12px solid #ee5a24;"></div>
+      </div>
+    </div>
+    <div class="fish fish-2">
+      <div class="fish-body">
+        <div class="fish-ellipse" style="background: linear-gradient(180deg, #4dc9f6, #1a8ab5);">
+          <div class="fish-eye"></div>
+        </div>
+        <div class="fish-tail" style="border-right: 12px solid #1a8ab5;"></div>
+      </div>
+    </div>
+    <div class="fish fish-3">
+      <div class="fish-body">
+        <div class="fish-ellipse" style="background: linear-gradient(180deg, #79e29d, #27ae60); width: 28px; height: 16px;">
+          <div class="fish-eye"></div>
+        </div>
+        <div class="fish-tail" style="border-right: 10px solid #27ae60;"></div>
+      </div>
+    </div>
+    <div class="fish fish-4">
+      <div class="fish-body">
+        <div class="fish-ellipse" style="background: linear-gradient(180deg, #f8c291, #e17055);">
+          <div class="fish-eye"></div>
+        </div>
+        <div class="fish-tail" style="border-right: 12px solid #e17055;"></div>
+      </div>
+    </div>
+
+    <!-- Jellyfish -->
+    <div class="jellyfish" style="top: 42%; left: 25%; animation-delay: 0s;">
+      <div class="jelly-head" style="background: radial-gradient(circle, rgba(200,100,255,0.6), rgba(150,50,200,0.3));"></div>
+      <div style="display: flex;">
+        <div class="jelly-tentacle" style="background: rgba(200,100,255,0.3); animation-delay: 0s;"></div>
+        <div class="jelly-tentacle" style="background: rgba(200,100,255,0.4); animation-delay: 0.3s;"></div>
+        <div class="jelly-tentacle" style="background: rgba(200,100,255,0.3); animation-delay: 0.6s;"></div>
+      </div>
+    </div>
+    <div class="jellyfish" style="top: 65%; left: 75%; animation-delay: 2s;">
+      <div class="jelly-head" style="background: radial-gradient(circle, rgba(100,200,255,0.5), rgba(50,150,200,0.3)); width: 24px; height: 16px;"></div>
+      <div style="display: flex;">
+        <div class="jelly-tentacle" style="background: rgba(100,200,255,0.3); height: 14px;"></div>
+        <div class="jelly-tentacle" style="background: rgba(100,200,255,0.4); height: 14px; animation-delay: 0.4s;"></div>
+        <div class="jelly-tentacle" style="background: rgba(100,200,255,0.3); height: 14px; animation-delay: 0.8s;"></div>
+      </div>
+    </div>
+
+    <!-- Coral -->
+    <div class="coral-group" style="left: 10%;">
+      <div class="coral" style="background: #ff6b6b; height: 35px; animation-delay: 0s;"></div>
+      <div class="coral" style="background: #ee5a24; height: 28px; animation-delay: 0.5s;"></div>
+      <div class="coral" style="background: #ff9f43; height: 40px; animation-delay: 1s;"></div>
+      <div class="coral" style="background: #f8c291; height: 25px; animation-delay: 0.3s;"></div>
+    </div>
+    <div class="coral-group" style="left: 60%;">
+      <div class="coral" style="background: #a29bfe; height: 30px; animation-delay: 0.7s;"></div>
+      <div class="coral" style="background: #6c5ce7; height: 45px; animation-delay: 0.2s;"></div>
+      <div class="coral" style="background: #a29bfe; height: 22px; animation-delay: 1.2s;"></div>
+    </div>
+    <div class="coral-group" style="left: 80%;">
+      <div class="coral" style="background: #ff6b6b; height: 20px;"></div>
+      <div class="coral" style="background: #ff9f43; height: 32px; animation-delay: 0.4s;"></div>
+    </div>
+
+    <!-- Seaweed -->
+    <div class="seaweed" style="left: 5%;">
+      <div class="seaweed-segment" style="background: #27ae60;"></div>
+      <div class="seaweed-segment" style="background: #2ecc71;"></div>
+      <div class="seaweed-segment" style="background: #27ae60;"></div>
+    </div>
+    <div class="seaweed" style="left: 35%; animation-delay: 1s;">
+      <div class="seaweed-segment" style="background: #2ecc71;"></div>
+      <div class="seaweed-segment" style="background: #27ae60;"></div>
+      <div class="seaweed-segment" style="background: #2ecc71;"></div>
+      <div class="seaweed-segment" style="background: #27ae60;"></div>
+    </div>
+    <div class="seaweed" style="left: 70%; animation-delay: 2s;">
+      <div class="seaweed-segment" style="background: #27ae60;"></div>
+      <div class="seaweed-segment" style="background: #2ecc71;"></div>
+    </div>
+
+    <!-- Temperature Gauge -->
+    <div class="temp-gauge">
+      <div class="temp-label-top">Hot</div>
+      <div class="temp-bar">
+        <div class="temp-indicator" id="tempIndicator" style="top: 10%;"></div>
+      </div>
+      <div class="temp-label-bottom">Cold</div>
+    </div>
+
+    <!-- Depth Control -->
+    <div class="depth-control">
+      <label>Depth</label>
+      <input type="range" class="depth-slider" id="depthSlider" min="0" max="1000" value="300" orient="vertical">
+      <div class="depth-value" id="depthDisplay">300<span>m</span></div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="label">Location</div>
+        <div class="val cyan" id="statusLocation">15.5N, 72.8E</div>
+      </div>
+      <div class="status-item">
+        <div class="label">Temperature</div>
+        <div class="val yellow" id="statusTemp">25.6°C</div>
+      </div>
+      <div class="status-item">
+        <div class="label">Risk Level</div>
+        <div class="val green" id="statusRisk">LOW</div>
+      </div>
+      <div class="status-item">
+        <div class="label">Date</div>
+        <div class="val cyan" id="statusDate">2026-01-15</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Bubbles generator
+    function createBubbles() {
+      const ocean = document.getElementById('ocean');
+      for (let i = 0; i < 25; i++) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const size = Math.random() * 12 + 4;
+        bubble.style.width = size + 'px';
+        bubble.style.height = size + 'px';
+        bubble.style.left = Math.random() * 100 + '%';
+        bubble.style.top = Math.random() * 70 + 20 + '%';
+        bubble.style.animation = `bubbleRise ${Math.random() * 8 + 6}s ease-in-out infinite`;
+        bubble.style.animationDelay = `${Math.random() * 5}s`;
+        ocean.appendChild(bubble);
+      }
+    }
+
+    // Plankton generator
+    function createPlankton() {
+      const ocean = document.getElementById('ocean');
+      for (let i = 0; i < 40; i++) {
+        const p = document.createElement('div');
+        p.className = 'plankton';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.top = Math.random() * 60 + 30 + '%';
+        p.style.animationDuration = Math.random() * 15 + 15 + 's';
+        p.style.animationDelay = Math.random() * 10 + 's';
+        ocean.appendChild(p);
+      }
+    }
+
+    // Depth slider interaction
+    const depthSlider = document.getElementById('depthSlider');
+    const depthDisplay = document.getElementById('depthDisplay');
+    const submarine = document.getElementById('submarine');
+    const tempIndicator = document.getElementById('tempIndicator');
+    const statusTemp = document.getElementById('statusTemp');
+    const statusRisk = document.getElementById('statusRisk');
+
+    const depthPositions = {
+      0: 14, 5: 15, 10: 16, 20: 18, 30: 20, 50: 23,
+      75: 26, 100: 29, 125: 32, 150: 35, 200: 38,
+      300: 45, 500: 58, 700: 72, 1000: 88
+    };
+
+    function getTempForDepth(depth) {
+      if (depth <= 10) return 28.4;
+      if (depth <= 50) return 27.5;
+      if (depth <= 100) return 26.8;
+      if (depth <= 200) return 24.2;
+      if (depth <= 300) return 21.5;
+      if (depth <= 500) return 16.3;
+      if (depth <= 700) return 10.8;
+      return 4.2;
+    }
+
+    function getRiskLevel(depth) {
+      if (depth < 200) return { level: 'LOW', color: '#79e29d' };
+      if (depth < 500) return { level: 'MODERATE', color: '#ffe566' };
+      if (depth < 800) return { level: 'HIGH', color: '#ff9f43' };
+      return { level: 'EXTREME', color: '#ff6b6b' };
+    }
+
+    function findClosestDepth(val) {
+      const depths = Object.keys(depthPositions).map(Number);
+      return depths.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+    }
+
+    depthSlider.addEventListener('input', function() {
+      const depth = parseInt(this.value);
+      depthDisplay.innerHTML = depth + '<span>m</span>';
+
+      // Move submarine
+      const closest = findClosestDepth(depth);
+      const topPos = depthPositions[closest] || 50;
+      submarine.style.top = topPos + '%';
+
+      // Update temperature
+      const temp = getTempForDepth(depth);
+      statusTemp.textContent = temp.toFixed(1) + '°C';
+
+      // Update temp indicator
+      const tempPercent = ((depth / 1000) * 90) + 5;
+      tempIndicator.style.top = tempPercent + '%';
+
+      // Update risk
+      const risk = getRiskLevel(depth);
+      statusRisk.textContent = risk.level;
+      statusRisk.style.color = risk.color;
+    });
+
+    createBubbles();
+    createPlankton();
+  </script>
+</body>
+</html>

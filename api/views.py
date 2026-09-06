@@ -16,6 +16,8 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
 
+from . import model_service
+
 STANDARD_DEPTHS = [0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 300, 500, 700, 1000]
 AUTH_RATE_LIMITS = {
     "login": {"limit": 5, "window_seconds": 300},
@@ -52,6 +54,7 @@ def api_index(request):
                 "logout": "/api/auth/logout/",
                 "current_user": "/api/auth/me/",
                 "model_status": "/api/model/status/",
+                "metrics": "/api/metrics/",
                 "datasets": "/api/datasets/",
                 "predict": "/api/predict/",
             },
@@ -298,13 +301,51 @@ def current_user(request):
 
 @require_GET
 def model_status(request):
+    info = model_service.model_info()
+    if info["mode"] == "ready":
+        message = f"Model '{info['model_name']}' loaded from {info['model_dir']}. Live predictions active."
+    else:
+        message = (
+            "No trained model found. Backend is serving deterministic demo predictions until the "
+            "AIML team drops model/infer.py (and weights) — see MODEL_INTEGRATION.md."
+        )
     return JsonResponse(
         {
-            "status": "mock-ready",
-            "message": "Backend is serving deterministic demo predictions until the AI/ML model is connected.",
+            "status": "ready" if info["mode"] == "ready" else "mock-ready",
+            "mode": info["mode"],
+            "message": message,
+            "model_name": info["model_name"],
+            "weights_loaded": info["weights_loaded"],
+            "inference_module": info["inference_module"],
+            "metrics_available": info["metrics_available"],
             "input_variables": ["sst", "sss", "ssh_or_sla", "current_u", "current_v", "wind_u", "wind_v"],
             "standard_depths_m": STANDARD_DEPTHS,
             "region_bounds": REGION_BOUNDS,
+        }
+    )
+
+
+@require_GET
+def skill_metrics(request):
+    payload = model_service.load_skill_metrics()
+    if payload is None:
+        return JsonResponse(
+            {
+                "available": False,
+                "message": "Skill metrics not available yet. Run the validation framework and save the output to model/metrics.json.",
+                "metrics": None,
+                "per_depth": [],
+            }
+        )
+    model = payload.get("model") or {}
+    return JsonResponse(
+        {
+            "available": True,
+            "message": "Skill scores computed against independent gridded ARGO observations.",
+            "model_name": model.get("name"),
+            "metrics": payload.get("overall"),
+            "per_depth": payload.get("per_depth", []),
+            "validation": payload.get("validation"),
         }
     )
 
@@ -347,22 +388,22 @@ def predict_temperature(request):
     requested_depths = payload.get("depths") or STANDARD_DEPTHS
     surface = payload.get("surface_observations") or {}
 
-    predictions = [
-        {
-            "depth_m": int(depth),
-            "temperature_c": _demo_temperature(latitude, longitude, int(depth), surface),
-        }
-        for depth in requested_depths
-    ]
+    result = model_service.run_inference(
+        latitude=latitude,
+        longitude=longitude,
+        date_iso=payload.get("date"),
+        depths=requested_depths,
+        surface=surface,
+    )
 
     return JsonResponse(
         {
-            "mode": "demo",
-            "message": "Replace the demo predictor with the trained AI/ML model when it is ready.",
+            "mode": result["mode"],
+            "message": result["message"],
             "location": {"latitude": latitude, "longitude": longitude},
             "date": payload.get("date"),
             "grid_resolution": "0.25 x 0.25 degree",
-            "predictions": predictions,
+            "predictions": result["predictions"],
         }
     )
 

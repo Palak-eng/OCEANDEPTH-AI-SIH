@@ -193,6 +193,26 @@ Logs out the current user.
 
 Returns the current logged-in user. Returns `401` if the user is not logged in.
 
+### `GET /api/metrics/`
+
+Returns overall and per-depth skill scores (RMSE, correlation, bias, profile counts) from `model/metrics.json`.
+
+Response when available:
+
+```json
+{
+  "available": true,
+  "model_name": "OceanEmbed-ViT v1",
+  "metrics": { "rmse_c": 1.23, "correlation": 0.92, "bias_c": -0.08, "n_profiles": 4521 },
+  "per_depth": [
+    { "depth_m": 0, "rmse_c": 0.72, "correlation": 0.99, "bias_c": 0.05, "n": 4521 }
+  ],
+  "validation": { "dataset": "INCOIS LAS Gridded ARGO", "period": "...", "region": "..." }
+}
+```
+
+Returns `available: false` until the validation framework output is saved as `model/metrics.json`.
+
 ### `GET /api/datasets/`
 
 Returns recommended input and target datasets from the problem statement.
@@ -300,6 +320,15 @@ await fetch("http://127.0.0.1:8000/api/auth/login/", {
 - For free DDoS protection during hosting, put the deployed site behind Cloudflare Free if possible.
 - For production, set `DJANGO_DEBUG=false`, use a strong `DJANGO_SECRET_KEY`, and use HTTPS.
 
-## AI/ML Integration Notes
+## AI/ML Integration
 
-When the trained model is ready, replace the internals of `predict_temperature` in `api/views.py` or call a separate model service from there. Keep the request and response shape same so the frontend does not break.
+The trained model plugs in through `api/model_service.py`. See `MODEL_INTEGRATION.md`
+for the exact drop-in contract:
+
+- Drop `model/infer.py` (+ weights) and `model/metrics.json` into the `model/` folder.
+- `/api/predict/` automatically switches from demo mode to `"mode": "ml"`.
+- `/api/model/status/` reports `"status": "ready"` when the model is loaded.
+- `/api/metrics/` serves the validation skill scores to the analytics page.
+
+No Django view changes are needed once the artifacts are in place. Override paths
+with `OCEAN_MODEL_PATH` / `OCEAN_METRICS_PATH` when weights are stored elsewhere.
