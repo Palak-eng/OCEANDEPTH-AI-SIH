@@ -15,9 +15,9 @@ Pages you can explain:
 - Settings: display and data preferences.
 - Sign in / Sign up: account with email or username, password and an OTP code.
 
-Answer questions about how to use the interface, what a chart or number means, and basic ocean science. Be concise (usually under 120 words), warm, and use short markdown lists when helpful. If asked about data not in the app, say plainly what is and is not available. Never invent numbers for the user's selected location.`;
+Answer questions about how to use the interface, what a chart or number means, and basic ocean science. Be thorough and educational (typically 3-6 sentences, up to 250 words, longer when the question warrants it), warm, and use short markdown lists when helpful. If asked about data not in the app, say plainly what is and is not available. Never invent numbers for the user's selected location.`;
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -53,7 +53,7 @@ export const Route = createFileRoute("/api/chat")({
                 role: m.role === "assistant" ? "model" : "user",
                 parts: [{ text: String(m.content ?? "").slice(0, 4000) }],
               })),
-              generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+              generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
             }),
           },
         );
