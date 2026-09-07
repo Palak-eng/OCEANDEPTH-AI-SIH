@@ -1,0 +1,39 @@
+# OceanEmbed Configuration
+
+project:
+  name: OceanEmbed
+  framework: tensorflow
+
+region:
+  latitude_min: 5
+  latitude_max: 30
+  longitude_min: 45
+  longitude_max: 105
+
+resolution:
+  latitude: 0.25
+  longitude: 0.25
+
+target_depths:
+  - 0
+  - 5
+  - 10
+  - 20
+  - 30
+  - 50
+  - 75
+  - 100
+  - 125
+  - 150
+  - 200
+  - 300
+  - 500
+  - 700
+  - 1000
+
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  samples: data/samples
+  models: models
+  outputs: outputs
